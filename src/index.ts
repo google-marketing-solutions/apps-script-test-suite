@@ -19,206 +19,16 @@
  * @fileoverview Mocked classes for Apps Script to help with unit tests.
  */
 
-import { PropertyStore } from 'common/types';
-
+import { FakeSpreadsheetApp } from './spreadsheet_app';
+import BigQuery = GoogleAppsScript.BigQuery;
 import Properties = GoogleAppsScript.Properties;
 import Cache = GoogleAppsScript.Cache;
 import Mail = GoogleAppsScript.Mail;
-
-function a1NotationToRowColumn(a1Notation: string, start = true) {
-  const a = 'A'.charCodeAt(0);
-  let column = 0;
-  let i;
-  const parts = a1Notation.toUpperCase().match(/([A-Z]+)([1-9]\d*)?/);
-  if (!parts) {
-    throw new Error('Invalid A1 notation');
-  }
-  const letters = parts[1];
-  const row: number = parts[2]
-    ? Number.parseInt(parts[2], 10)
-    : start
-      ? 1
-      : 100_000;
-  for (i = 0; i < letters.length; i++) {
-    column += letters.charCodeAt(i) - a + 1;
-  }
-
-  return { row, column };
-}
-
-class FakeRange {
-  private readonly arrayRange: string[][];
-
-  constructor(
-    private readonly sheet: FakeSheet,
-    private readonly row: number,
-    private readonly column: number,
-    private readonly numRows = 1,
-    private readonly numColumns = 1,
-  ) {
-    this.arrayRange = this.initializeSheet();
-  }
-
-  private getRangeComponent() {
-    return this.sheet.cells.slice(this.row - 1, this.row - 1 + this.numRows);
-  }
-
-  initializeSheet() {
-    return this.getRangeComponent().map((columns) =>
-      columns
-        .slice(this.column - 1, this.column - 1 + this.numColumns)
-        .map((cell) => cell ?? ''),
-    );
-  }
-  static byA1Notation(sheet: FakeSheet, a1Notation: string) {
-    const parts = a1Notation.split(':');
-    const { row: row1, column: column1 } = a1NotationToRowColumn(
-      parts[0],
-      true,
-    );
-    const { row: row2, column: column2 } = a1NotationToRowColumn(
-      parts[1] || parts[0],
-      false,
-    );
-    return new FakeRange(
-      sheet,
-      row1,
-      column1,
-      row2 - row1 + 1,
-      column2 - column1 + 1,
-    );
-  }
-
-  getValues() {
-    return this.arrayRange;
-  }
-
-  getValue() {
-    return this.arrayRange[0][0];
-  }
-
-  setValues(range: string[][]) {
-    if (this.arrayRange.length !== range.length) {
-      throw new Error('Invalid row length');
-    }
-    for (const [i, row] of range.entries()) {
-      if (row.length === this.arrayRange[0].length) {
-        this.arrayRange[i] = row;
-      } else {
-        throw new Error('Invalid column length');
-      }
-    }
-    this.sheet.cells.splice(
-      this.row - 1,
-      this.arrayRange.length,
-      ...this.arrayRange.map((row) => {
-        const newArr = [
-          ...row,
-          ...Array.from<string>({
-            length: this.sheet.cells[0].length - row.length,
-          }).fill(''),
-        ];
-        return newArr;
-      }),
-    );
-    return this;
-  }
-
-  setValue(value: string) {
-    this.arrayRange[0][0] = value;
-    return this;
-  }
-
-  clearDataValidations(): FakeRange {
-    return this;
-  }
-}
-
-class FakeSheet {
-  readonly cells: string[][] = Array.from({ length: 100 }).map(() =>
-    Array.from({ length: 30 }),
-  );
-  lastRow = 1;
-  lastColumn = 1;
-
-  getRange(a1Notation: string): FakeRange;
-  getRange(row: number, column: number): FakeRange;
-  getRange(row: number, column: number, numRows: number): FakeRange;
-  getRange(
-    row: number,
-    column: number,
-    numRows: number,
-    numColumns: number,
-  ): FakeRange;
-  getRange(
-    arg1: number | string,
-    column?: number,
-    numRows?: number,
-    numColumns?: number,
-  ) {
-    if (typeof arg1 === 'string') {
-      return FakeRange.byA1Notation(this, arg1);
-    } else if (!column) {
-      throw new Error('Required to include a column');
-    }
-    this.lastRow = (numRows ?? 0) + arg1 - 1;
-    this.lastColumn = (numColumns ?? 0) + column - 1;
-    return new FakeRange(this, arg1, column, numRows, numColumns);
-  }
-
-  getDataRange(): FakeRange {
-    return new FakeRange(this, 1, 1, this.lastRow, this.lastColumn);
-  }
-
-  clear(): FakeSheet {
-    const emptyCells = this.cells.map((row) => row.map((col) => ''));
-    this.cells.splice(0, this.cells.length, ...emptyCells);
-    return this;
-  }
-}
+import { FakeSpreadsheet } from './sheet';
 
 class FakeHtmlService {
   createTemplateFromFile() {
     throw new Error('Not implemented. Stub me.');
-  }
-}
-
-class FakeSpreadsheet {
-  private static lastNum = 1;
-  private readonly namedRange: Record<string, FakeRange> = {};
-  private readonly sheets: Record<string, FakeSheet> = {
-    Sheet1: new FakeSheet(),
-  };
-  private lastActive = 'Sheet1';
-
-  insertSheet(sheetName: string) {
-    const computedSheetName = sheetName || `Sheet${++FakeSpreadsheet.lastNum}`;
-    this.sheets[computedSheetName] = new FakeSheet();
-    return this.sheets[computedSheetName];
-  }
-
-  getRangeByName(rangeName: string) {
-    return this.namedRange[rangeName];
-  }
-
-  setNamedRange(rangeName: string, range: FakeRange) {
-    this.namedRange[rangeName] = range;
-  }
-
-  getSheetByName(sheetName: keyof typeof this.sheets) {
-    return this.sheets[sheetName];
-  }
-
-  getActiveSheet() {
-    return this.sheets[this.lastActive];
-  }
-}
-
-class FakeSpreadsheetApp {
-  private readonly fakeSpreadsheet = new FakeSpreadsheet();
-
-  getActive() {
-    return this.fakeSpreadsheet;
   }
 }
 
@@ -237,15 +47,16 @@ export function mockAppsScript() {
   (globalThis.SpreadsheetApp as unknown as FakeSpreadsheetApp) =
     new FakeSpreadsheetApp();
   (globalThis.ScriptApp as unknown as FakeScriptApp) = new FakeScriptApp();
-  (globalThis.Utilities as unknown as FakeUtilities) = new FakeUtilities();
   (globalThis.HtmlService as unknown as FakeHtmlService) =
     new FakeHtmlService();
   (globalThis.UrlFetchApp as unknown as FakeUrlFetchApp) =
     new FakeUrlFetchApp();
+  (globalThis.Drive as unknown as FakeDrive) = new FakeDrive();
+  (globalThis.BigQuery as unknown as FakeBigQuery) = new FakeBigQuery();
 }
 
 class FakeUrlFetchApp {
-  fetch(url: string) {
+  fetch() {
     throw new Error('Not implemented. Mock me.');
   }
 }
@@ -264,19 +75,6 @@ export function generateFakeHttpResponse(args: { contentText: string }) {
 class FakeScriptApp {
   getOAuthToken() {
     return 'token';
-  }
-}
-
-class FakeUtilities {
-  parseCsv(text: string) {
-    // We don't need a special package because this test CSV is very
-    // basic. No escaping, etc.
-    const lines = text.split('\n').map((line: string) => line.split(','));
-    return lines;
-  }
-
-  sleep(msecs: number) {
-    console.info(`skip sleep for ${msecs}`);
   }
 }
 
@@ -339,7 +137,7 @@ class CacheStub implements Cache.Cache {
   private cache: Record<string, string> = {};
   expirationInSeconds: number | undefined;
 
-  getAll(keys: string[]): Record<string, string> {
+  getAll(): Record<string, string> {
     throw new Error('Method not implemented.');
   }
   putAll(values: Record<string, string>): void;
@@ -446,23 +244,105 @@ export class FakeUtilitiesService {
 }
 
 /**
- * Test-friendly property wrapper lacks Apps Script dependency.
+ * Stub for HTML output
  */
-export class FakePropertyStore implements PropertyStore {
-  private static cache: Record<string, string> = {};
+export class FakeHtmlOutput {}
 
-  setProperty(propertyName: string, value: string): void {
-    FakePropertyStore.cache[propertyName] = value;
-  }
-  getProperty(propertyName: string): string | null {
-    return FakePropertyStore.cache[propertyName];
-  }
+/**
+ * Stub for Drive testing
+ */
+export class FakeDrive {}
 
-  getProperties() {
-    return FakePropertyStore.cache;
-  }
+class FakeBigQuery {
+  Jobs = new FakeBigQueryJobs();
+}
 
-  static clearCache() {
-    FakePropertyStore.cache = {};
+class FakeBigQueryJobs {
+  query: () => BigQuery.Schema.QueryResponse = () => {
+    throw new Error('Not implemented');
+  };
+}
+
+// findLastIndex isn't properly supported in TypeScript definitions at the moemnt.
+declare global {
+  interface Array<T> {
+    /**
+     * Returns the value of the last element in the array where predicate is true, and undefined
+     * otherwise.
+     * @param predicate findLast calls predicate once for each element of the array, in descending
+     * order, until it finds one where predicate returns true. If such an element is found, findLast
+     * immediately returns that element value. Otherwise, findLast returns undefined.
+     * @param thisArg If provided, it will be used as the this value for each invocation of
+     * predicate. If it is not provided, undefined is used instead.
+     */
+    findLast<S extends T>(
+      predicate: (value: T, index: number, array: T[]) => value is S,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      thisArg?: any,
+    ): S | undefined;
+    findLast(
+      predicate: (value: T, index: number, array: T[]) => unknown,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      thisArg?: any,
+    ): T | undefined;
+
+    /**
+     * Returns the index of the last element in the array where predicate is true, and -1
+     * otherwise.
+     * @param predicate findLastIndex calls predicate once for each element of the array, in descending
+     * order, until it finds one where predicate returns true. If such an element is found,
+     * findLastIndex immediately returns that element index. Otherwise, findLastIndex returns -1.
+     * @param thisArg If provided, it will be used as the this value for each invocation of
+     * predicate. If it is not provided, undefined is used instead.
+     */
+    findLastIndex(
+      predicate: (value: T, index: number, array: T[]) => unknown,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      thisArg?: any,
+    ): number;
+
+    /**
+     * Returns a copy of an array with its elements reversed.
+     */
+    toReversed(): T[];
+
+    /**
+     * Returns a copy of an array with its elements sorted.
+     * @param compareFn Function used to determine the order of the elements. It is expected to return
+     * a negative value if the first argument is less than the second argument, zero if they're equal, and a positive
+     * value otherwise. If omitted, the elements are sorted in ascending, ASCII character order.
+     * ```ts
+     * [11, 2, 22, 1].toSorted((a, b) => a - b) // [1, 2, 11, 22]
+     * ```
+     */
+    toSorted(compareFn?: (a: T, b: T) => number): T[];
+
+    /**
+     * Copies an array and removes elements and, if necessary, inserts new elements in their place. Returns the copied array.
+     * @param start The zero-based location in the array from which to start removing elements.
+     * @param deleteCount The number of elements to remove.
+     * @param items Elements to insert into the copied array in place of the deleted elements.
+     * @returns The copied array.
+     */
+    toSpliced(start: number, deleteCount: number, ...items: T[]): T[];
+
+    /**
+     * Copies an array and removes elements while returning the remaining elements.
+     * @param start The zero-based location in the array from which to start removing elements.
+     * @param deleteCount The number of elements to remove.
+     * @returns A copy of the original array with the remaining elements.
+     */
+    toSpliced(start: number, deleteCount?: number): T[];
+
+    /**
+     * Copies an array, then overwrites the value at the provided index with the
+     * given value. If the index is negative, then it replaces from the end
+     * of the array.
+     * @param index The index of the value to overwrite. If the index is
+     * negative, then it replaces from the end of the array.
+     * @param value The value to write into the copied array.
+     * @returns The copied array with the updated value.
+     */
+    with(index: number, value: T): T[];
   }
 }

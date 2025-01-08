@@ -1,0 +1,21 @@
+{
+  "name": "apps-script-test-suite",
+  "version": "1.0.0",
+  "description": "A test suite to enable Apps Script tests",
+  "main": "src/index.ts",
+  "repository": "git@github.com:googlestaging/apps-script-test-suite.git",
+  "author": "Sean Capaloff-Jones <seancjones@google.com>",
+  "license": "MIT",
+  "scripts": {
+    "test": "mocha"
+  },
+  "devDependencies": {
+    "@types/chai": "^5.0.0",
+    "@types/google-apps-script": "^1.0.84",
+    "@types/mocha": "^10.0.9",
+    "chai": "^5.1.1",
+    "mocha": "^10.7.3",
+    "prettier": "^3.3.3",
+    "tsx": "^4.19.1"
+  }
+}
