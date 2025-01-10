@@ -41,7 +41,6 @@ export class FakeRange {
   initializeSheet() {
     return this.getRangeComponent().map((columns) =>
       columns
-        .slice(this.column - 1, this.column - 1 + this.numColumns)
         .map((cell) => cell ?? ''),
     );
   }
@@ -52,6 +51,22 @@ export class FakeRange {
 
   getValue() {
     return this.arrayRange[0][0];
+  }
+
+  getRow() {
+    return this.row;
+  }
+
+  getColumn() {
+    return this.column;
+  }
+
+  getNumRows() {
+    return this.numRows;
+  }
+
+  getNumColumns() {
+    return this.numColumns;
   }
 
   setValues(range: string[][]) {
@@ -85,7 +100,7 @@ export class FakeRange {
 
   setValue(value: string) {
     this.arrayRange[0][0] = value;
-    this.sheet.cells[this.row][this.column] = value;
+    this.sheet.cells[this.row - 1][this.column - 1] = value;
     return this;
   }
 
@@ -127,8 +142,8 @@ export class FakeRange {
   }
 
   insertCheckboxes() {
-    for (let r = this.row; r < this.row + this.numRows; r++) {
-      for (let c = this.column; c < this.column + this.numColumns; c++) {
+    for (let r = this.row - 1; r < this.row - 1 + this.numRows; r++) {
+      for (let c = this.column - 1; c < this.column - 1 + this.numColumns; c++) {
         if (!this.sheet.checkboxes[r]) {
           this.sheet.checkboxes[r] = {};
         }

@@ -1,6 +1,8 @@
 import { byA1Notation } from './common';
 import { FakeRange } from './range';
 
+const ONE_BASE_OFFSET = 1;
+
 export class FakeSheet {
   readonly cells: string[][] = Array.from({ length: 100 }).map(() =>
     Array.from({ length: 30 }),
@@ -9,6 +11,7 @@ export class FakeSheet {
   private readonly bandings: FakeBandings[] = [];
 
   getRange(a1Notation: string): FakeRange;
+  getRange(row: number): FakeRange;
   getRange(row: number, column: number): FakeRange;
   getRange(row: number, column: number, numRows: number): FakeRange;
   getRange<T extends number | string>(
@@ -39,7 +42,7 @@ export class FakeSheet {
     const lastIndexes = this.cells.map((row) =>
       row.findLastIndex((cell) => cell),
     );
-    return Math.max(...lastIndexes) + 1;
+    return Math.max(0, ...lastIndexes) + ONE_BASE_OFFSET;
   }
 
   clear(): FakeSheet {
@@ -57,19 +60,21 @@ export class FakeSheet {
   }
 
   getLastRow() {
-    return (
-      this.cells.findLastIndex((row) => row.filter((cell) => cell).length > 0) +
-      1
+    return Math.max(
+      1,
+      this.cells.findLastIndex(
+        (row) => row.filter((cell) => cell).length > 0
+      ) + ONE_BASE_OFFSET,
     );
   }
 
   deleteRows(start: number, end: number) {
-    this.cells.splice(start, end);
+    this.cells.splice(start - 1, end);
   }
 
   deleteColumns(start: number, end: number) {
     for (const row of this.cells) {
-      row.splice(start, end);
+      row.splice(start - 1, end);
     }
   }
 
@@ -86,7 +91,9 @@ export class FakeSpreadsheet {
   };
   private lastActive = 'Sheet1';
 
-  insertSheet(sheetName: string) {
+  insertSheet(): FakeSheet;
+  insertSheet(sheetName: string): FakeSheet;
+  insertSheet(sheetName?: string) {
     const computedSheetName = sheetName || `Sheet${++FakeSpreadsheet.lastNum}`;
     this.sheets[computedSheetName] = new FakeSheet();
     return this.sheets[computedSheetName];
