@@ -11,7 +11,7 @@ this test suite for new use cases.
 
 #### Chai example
 
-```
+```typescript
 import { mockAppsScript } from 'apps-script-test-suite/';
 import { expect } from 'chai';
 
